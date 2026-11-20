@@ -12,6 +12,7 @@ paper, and should work well for many different datasets without changes.
 Note: the results reported in the paper are averaged over 3 random repetitions
 with an 80/20 split.
 """
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.losses import CategoricalCrossentropy
