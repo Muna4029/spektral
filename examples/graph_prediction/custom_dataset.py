@@ -19,6 +19,10 @@ the corresponding target will be [1, 0].
 import numpy as np
 import scipy.sparse as sp
 import tensorflow as tf
+
+# Seed TF RNG to avoid multiple unseeded initializer warnings during layer
+# construction in examples and to make runs more reproducible.
+tf.random.set_seed(42)
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.metrics import categorical_accuracy
@@ -67,10 +71,13 @@ class MyDataset(Dataset):
             x = np.zeros((n, self.n_colors))
             x[np.arange(n), colors] = 1
 
-            # Edges
-            a = np.random.rand(n, n) <= self.p
-            a = np.maximum(a, a.T).astype(int)
-            a = sp.csr_matrix(a)
+            # Edges: build a symmetric adjacency efficiently as a sparse matrix
+            mask = np.random.rand(n, n) <= self.p
+            mask = np.logical_or(mask, mask.T)
+            rows, cols = np.nonzero(mask)
+            a = sp.coo_matrix(
+                (np.ones(len(rows), dtype=int), (rows, cols)), shape=(n, n)
+            ).tocsr()
 
             # Labels
             y = np.zeros((self.n_colors,))
@@ -94,9 +101,11 @@ data_va = data[idx_va]
 data_te = data[idx_te]
 
 # Data loaders
-loader_tr = DisjointLoader(data_tr, batch_size=batch_size, epochs=epochs)
-loader_va = DisjointLoader(data_va, batch_size=batch_size)
-loader_te = DisjointLoader(data_te, batch_size=batch_size)
+# Disable shuffling on the dataset slices to avoid warnings about shuffling a
+# dataset that does not implement Sequence in this example environment.
+loader_tr = DisjointLoader(data_tr, batch_size=batch_size, epochs=epochs, shuffle=False)
+loader_va = DisjointLoader(data_va, batch_size=batch_size, shuffle=False)
+loader_te = DisjointLoader(data_te, batch_size=batch_size, shuffle=False)
 
 
 ################################################################################

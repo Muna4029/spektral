@@ -3,14 +3,14 @@ import os.path as osp
 import warnings
 
 import numpy as np
-import tensorflow as tf
+from collections.abc import Sequence
 
 from spektral.data.graph import Graph
 from spektral.data.utils import get_spec
 from spektral.datasets.utils import DATASET_FOLDER
 
 
-class Dataset:
+class Dataset(Sequence):
     """
     A container for Graph objects. This class can be extended to represent a
     graph dataset.
@@ -267,6 +267,9 @@ class Dataset:
 
         Each sub-dictionary will have keys `spec`, `shape` and `dtype`.
         """
+        # Import TensorFlow lazily to avoid module-level TF initialization
+        import tensorflow as tf
+
         if len(self.graphs) == 0:
             return None
         signature = {}

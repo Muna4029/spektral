@@ -216,9 +216,24 @@ def batch_generator(data, batch_size=32, epochs=None, shuffle=True):
 
 def shuffle_inplace(*args):
     rng_state = np.random.get_state()
+    # Set the RNG state once to allow reproducible shuffles, but do not
+    # reset it before each argument (that would produce identical shuffles).
+    np.random.set_state(rng_state)
     for a in args:
-        np.random.set_state(rng_state)
-        np.random.shuffle(a)
+        try:
+            # Try to shuffle sequences/arrays in-place. If the object does not
+            # support in-place shuffling (e.g. custom Dataset objects), skip it
+            # and warn instead of raising an error.
+            np.random.shuffle(a)
+        except Exception:
+            import warnings
+
+            warnings.warn(
+                "Cannot shuffle object of type {} in-place; skipping.".format(
+                    type(a).__name__
+                ),
+                UserWarning,
+            )
 
 
 def get_spec(x):

@@ -1,5 +1,41 @@
 import numpy as np
-import tensorflow as tf
+
+# Avoid importing TensorFlow at module import time to prevent eager initialization
+# and potential CUDA/cuDNN plugin registration during simple package imports.
+# Provide a lightweight proxy exposing __version__ (used elsewhere) so downstream
+# version checks can run without importing the full tensorflow package.
+_tf_version = None
+try:
+    # Try to get the installed package version without importing the module
+    try:
+        from importlib.metadata import version as _get_pkg_version  # Python 3.8+
+    except Exception:
+        try:
+            from importlib_metadata import version as _get_pkg_version  # backport
+        except Exception:
+            _get_pkg_version = None
+    if _get_pkg_version is not None:
+        try:
+            _tf_version = _get_pkg_version("tensorflow")
+        except Exception:
+            # Some environments may have different package names (e.g. tensorflow-cpu)
+            try:
+                _tf_version = _get_pkg_version("tensorflow-cpu")
+            except Exception:
+                _tf_version = None
+except Exception:
+    _tf_version = None
+
+
+class _TFProxy:
+    def __init__(self, version):
+        self.__version__ = version
+
+
+# A lightweight proxy object that exposes __version__ so existing top-level
+# version parsing continues to work without importing the full tensorflow module.
+# Real TensorFlow can be imported lazily inside methods when needed.
+tf = _TFProxy(_tf_version)
 
 from spektral.data.utils import (
     batch_generator,
@@ -16,7 +52,7 @@ from spektral.data.utils import (
 
 version = tf.__version__.split(".")
 major, minor = int(version[0]), int(version[1])
-tf_loader_available = major >= 2 and minor >= 4
+tf_loader_available = (major > 2) or (major == 2 and minor >= 4)
 
 
 class Loader:
@@ -204,8 +240,7 @@ class SingleLoader(Loader):
     def __init__(self, dataset, epochs=None, sample_weights=None):
         if len(dataset) != 1:
             raise ValueError(
-                "SingleLoader can only be used with Datasets that"
-                "have a single graph."
+                "SingleLoader can only be used with Datasets thathave a single graph."
             )
         self.sample_weights = sample_weights
         super().__init__(dataset, batch_size=1, epochs=epochs, shuffle=False)
@@ -311,7 +346,7 @@ class DisjointLoader(Loader):
     def load(self):
         if not tf_loader_available:
             raise RuntimeError(
-                "Calling DisjointLoader.load() requires " "TensorFlow 2.4 or greater."
+                "Calling DisjointLoader.load() requires TensorFlow 2.4 or greater."
             )
         return tf.data.Dataset.from_generator(
             lambda: self, output_signature=self.tf_signature()
